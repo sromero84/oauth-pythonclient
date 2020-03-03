@@ -116,12 +116,15 @@ class AuthClient(requests.Session):
             'redirect_uri': self.redirect_uri
         }
 
-        send_request('POST', self.token_endpoint, headers, self, body=urlencode(body), session=self)   
+        send_request('POST', self.token_endpoint, headers, self, body=urlencode(body), session=self)
 
     def refresh(self, refresh_token=None):
         """Gets fresh access_token and refresh_token 
         
         :param refresh_token: Refresh Token
+
+        :returns: True if token was successfully refreshed, False otherwise
+
         :raises ValueError: if Refresh Token value not specified
         :raises `intuitlib.exceptions.AuthClientError`: if response status != 200
         """
@@ -140,7 +143,19 @@ class AuthClient(requests.Session):
             'refresh_token': token
         }
 
-        send_request('POST', self.token_endpoint, headers, self, body=urlencode(body), session=self)
+        response = send_request('POST', self.token_endpoint, headers, self, body=urlencode(body), session=self)
+        response.raise_for_status()
+
+        if response.status_code == 200:
+            data = json.loads(response.text)
+
+            self.access_token = data["access_token"]
+            self.expires_in = data["expires_in"]
+            self.refresh_token = data["refresh_token"]
+            self.x_refresh_token_expires_in = data["x_refresh_token_expires_in"]
+            return True
+
+        return False
 
     def revoke(self, token=None):
         """Revokes access to QBO company/User Info using either valid Refresh Token or Access Token
